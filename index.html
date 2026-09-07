@@ -316,26 +316,18 @@ img {
   transition: all 0.3s var(--ease-soft);
   position: relative;
   overflow: hidden;
-}
-
-.key::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle at center, rgba(247, 241, 232, 0.2), transparent 60%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  line-height: 1;
 }
 
 .key:active {
   transform: scale(0.92);
   background: var(--glass-strong);
   border-color: var(--rose);
-}
-
-.key:active::before {
-  opacity: 1;
 }
 
 .key.is-key-back {
@@ -368,6 +360,15 @@ img {
   text-align: center;
   margin-top: var(--s-4);
   letter-spacing: 0.04em;
+}
+
+.pin-hidden-input {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ============================================
@@ -1402,33 +1403,29 @@ img {
     <h1 class="lock__heading">For Shaalu</h1>
     <p class="lock__sub">A small moment, just for you.</p>
 
-    <form class="lock__form" id="lock-form" autocomplete="off" novalidate>
+    <div class="lock__form" id="lock-form">
       <div class="pin-dots" id="pin-dots" aria-label="PIN entry">
-        <span class="pin-dot" data-i="0"></span>
-        <span class="pin-dot" data-i="1"></span>
-        <span class="pin-dot" data-i="2"></span>
-        <span class="pin-dot" data-i="3"></span>
+        <span class="pin-dot" id="pd0"></span>
+        <span class="pin-dot" id="pd1"></span>
+        <span class="pin-dot" id="pd2"></span>
+        <span class="pin-dot" id="pd3"></span>
       </div>
 
       <div class="keypad" id="keypad" role="group" aria-label="Number pad">
-        <button class="key" type="button" data-k="1">1</button>
-        <button class="key" type="button" data-k="2">2</button>
-        <button class="key" type="button" data-k="3">3</button>
-        <button class="key" type="button" data-k="4">4</button>
-        <button class="key" type="button" data-k="5">5</button>
-        <button class="key" type="button" data-k="6">6</button>
-        <button class="key" type="button" data-k="7">7</button>
-        <button class="key" type="button" data-k="8">8</button>
-        <button class="key" type="button" data-k="9">9</button>
-        <button class="key is-key-empty" type="button" tabindex="-1" aria-hidden="true"></button>
-        <button class="key" type="button" data-k="0">0</button>
-        <button class="key is-key-back" type="button" data-k="back" aria-label="Delete">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM18 9l-6 6M12 9l6 6"/>
-          </svg>
-        </button>
+        <div class="key" onclick="enterPin('1')">1</div>
+        <div class="key" onclick="enterPin('2')">2</div>
+        <div class="key" onclick="enterPin('3')">3</div>
+        <div class="key" onclick="enterPin('4')">4</div>
+        <div class="key" onclick="enterPin('5')">5</div>
+        <div class="key" onclick="enterPin('6')">6</div>
+        <div class="key" onclick="enterPin('7')">7</div>
+        <div class="key" onclick="enterPin('8')">8</div>
+        <div class="key" onclick="enterPin('9')">9</div>
+        <div class="key is-key-empty"></div>
+        <div class="key" onclick="enterPin('0')">0</div>
+        <div class="key is-key-back" onclick="enterPin('back')">⌫</div>
       </div>
-    </form>
+    </div>
 
     <p class="lock__hint">Hint · the day we began</p>
   </div>
@@ -1766,24 +1763,76 @@ img {
     }
   }
 
-  keypad.addEventListener('click', (e) => {
-    const k = e.target.closest('[data-k]');
-    if (!k) return;
-    inputKey(k.dataset.k);
+  // Direct event listeners on each button - most reliable on mobile
+  document.querySelectorAll('.key[data-k]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const key = btn.getAttribute('data-k');
+      inputKey(key);
+      // Keep hidden input focused for mobile keyboard
+      const hiddenInput = document.getElementById('pin-input');
+      if (hiddenInput) hiddenInput.focus();
+    });
+    // Also touchend for faster mobile response
+    btn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const key = btn.getAttribute('data-k');
+      inputKey(key);
+    }, { passive: false });
   });
 
-  // Keyboard support
+  // Hidden input for mobile keyboard typing
+  const pinInput = document.getElementById('pin-input');
+  if (pinInput) {
+    pinInput.addEventListener('input', (e) => {
+      const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+      if (value.length === 0) {
+        pin = '';
+        updatePinDots();
+        return;
+      }
+      // Set pin to the typed value
+      pin = value;
+      updatePinDots();
+      if (pin.length === 4) {
+        if (pin === CORRECT_PIN) {
+          setTimeout(() => showScene('gate'), 250);
+        } else {
+          shake();
+          setTimeout(() => {
+            pin = '';
+            updatePinDots();
+            pinInput.value = '';
+          }, 500);
+        }
+      }
+    });
+  }
+
+  // Make the keypad tappable to show mobile keyboard
+  document.getElementById('keypad').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (pinInput) pinInput.focus();
+  });
+
+  // Keyboard support — works for desktop keyboards
   document.addEventListener('keydown', (e) => {
     if (!scenes.lock.classList.contains('is-active')) return;
-    if (/^[0-9]$/.test(e.key)) inputKey(e.key);
-    else if (e.key === 'Backspace') inputKey('back');
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      inputKey(e.key);
+    } else if (e.key === 'Backspace') {
+      e.preventDefault();
+      inputKey('back');
+    }
   });
 
   // ============================================
   // AUDIO (mobile-safe)
   // ============================================
   let audioCtx = null;
-  let audioUnlocked = false;
 
   function ensureAudioCtx() {
     if (audioCtx) return audioCtx;
@@ -1795,17 +1844,22 @@ img {
   }
 
   async function playTrack(el, volume = 0.5, loop = false) {
-    if (!el || audioBlocked) return;
+    if (!el) return;
     try {
       ensureAudioCtx();
       el.loop = loop;
       el.volume = volume;
       el.currentTime = 0;
       await el.play();
-      audioUnlocked = true;
     } catch (err) {
-      console.warn('Audio blocked', err);
-      audioBlocked = true;
+      // Try again - mobile browsers can be tricky
+      try {
+        el.volume = volume;
+        el.currentTime = 0;
+        await el.play();
+      } catch (retryErr) {
+        console.warn('Audio play failed:', retryErr);
+      }
     }
   }
 
@@ -1813,13 +1867,13 @@ img {
     if (!el) return;
     if (fade) {
       const start = el.volume;
-      const step = start / 16;
+      const step = start / 10;
       let v = start;
       const id = setInterval(() => {
         v -= step;
         if (v <= 0) { el.pause(); el.currentTime = 0; el.volume = start; clearInterval(id); }
         else el.volume = v;
-      }, 50);
+      }, 40);
     } else {
       el.pause();
       el.currentTime = 0;
@@ -1829,8 +1883,6 @@ img {
   // GATE continue — the only place that unlocks audio
   $('#btn-continue').addEventListener('click', async () => {
     ensureAudioCtx();
-    // Preload audio files so they're ready later
-    try { audio.bgm.load(); audio.celebrate.load(); audio.ofcourse.load(); } catch(e) {}
     showScene('intro');
     playTrack(audio.bgm, 0.4, true);
   });
@@ -1840,13 +1892,13 @@ img {
 
   $('#btn-yes').addEventListener('click', async () => {
     stopTrack(audio.bgm, true);
-    await playTrack(audio.celebrate, 0.85, false);
+    await playTrack(audio.celebrate, 0.9, false);
     showScene('answered');
   });
 
   $('#btn-ofcourse').addEventListener('click', async () => {
     stopTrack(audio.bgm, true);
-    await playTrack(audio.ofcourse, 0.85, false);
+    await playTrack(audio.ofcourse, 0.9, false);
     showScene('answered');
   });
 
@@ -2022,6 +2074,14 @@ img {
   // INIT
   // ============================================
   showScene('lock');
+
+  // ============================================
+  // GLOBAL PIN HANDLER (called from onclick)
+  // ============================================
+  window.enterPin = function(k) {
+    if (!scenes.lock.classList.contains('is-active')) return;
+    inputKey(k);
+  };
 
   // Prevent body scroll on iOS when in fixed scenes
   document.addEventListener('touchmove', (e) => {
