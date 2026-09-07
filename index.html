@@ -1763,58 +1763,30 @@ img {
     }
   }
 
-  // Direct event listeners on each button - most reliable on mobile
-  document.querySelectorAll('.key[data-k]').forEach(btn => {
+  // Direct event listeners on each key - most reliable on mobile
+  document.querySelectorAll('.key').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const key = btn.getAttribute('data-k');
-      inputKey(key);
-      // Keep hidden input focused for mobile keyboard
-      const hiddenInput = document.getElementById('pin-input');
-      if (hiddenInput) hiddenInput.focus();
+      // Get key from text content for number keys
+      const text = btn.textContent.trim();
+      if (text === '⌫') {
+        inputKey('back');
+      } else if (/^[0-9]$/.test(text)) {
+        inputKey(text);
+      }
     });
     // Also touchend for faster mobile response
     btn.addEventListener('touchend', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const key = btn.getAttribute('data-k');
-      inputKey(key);
+      const text = btn.textContent.trim();
+      if (text === '⌫') {
+        inputKey('back');
+      } else if (/^[0-9]$/.test(text)) {
+        inputKey(text);
+      }
     }, { passive: false });
-  });
-
-  // Hidden input for mobile keyboard typing
-  const pinInput = document.getElementById('pin-input');
-  if (pinInput) {
-    pinInput.addEventListener('input', (e) => {
-      const value = e.target.value.replace(/\D/g, '').slice(0, 4);
-      if (value.length === 0) {
-        pin = '';
-        updatePinDots();
-        return;
-      }
-      // Set pin to the typed value
-      pin = value;
-      updatePinDots();
-      if (pin.length === 4) {
-        if (pin === CORRECT_PIN) {
-          setTimeout(() => showScene('gate'), 250);
-        } else {
-          shake();
-          setTimeout(() => {
-            pin = '';
-            updatePinDots();
-            pinInput.value = '';
-          }, 500);
-        }
-      }
-    });
-  }
-
-  // Make the keypad tappable to show mobile keyboard
-  document.getElementById('keypad').addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    if (pinInput) pinInput.focus();
   });
 
   // Keyboard support — works for desktop keyboards
