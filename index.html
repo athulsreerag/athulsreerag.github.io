@@ -1862,18 +1862,7 @@ img {
         inputKey(text);
       }
     });
-    // Also touchend for faster mobile response
-    btn.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const text = btn.textContent.trim();
-      if (text === '⌫') {
-        inputKey('back');
-      } else if (/^[0-9]$/.test(text)) {
-        inputKey(text);
-      }
-    }, { passive: false });
-  });
+  
 
   // Keyboard support — works for desktop keyboards
   document.addEventListener('keydown', (e) => {
